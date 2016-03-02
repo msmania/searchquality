@@ -42,21 +42,25 @@ class Search(object):
         batchleft = self.nresults
         while batchleft > 0:
             batchsize = min(self.maxquerylimit, batchleft)
-            j = self.singlequery(i, batchsize)
-            cachefile = self.getcachefilename(i + 1)
-            with open(cachefile, 'w') as outfile:
-                json.dump(j, outfile)
-            self.cachefiles += [cachefile]
-            self.results += self.parsejson(j)
-            batchleft -= batchsize
-            i += 1
+            pair = self.singlequery(i, batchsize)
+            if pair[0] == 0:
+                cachefile = self.getcachefilename(i + 1)
+                with open(cachefile, 'w') as outfile:
+                    outfile.write(pair[1])
+                self.cachefiles += [cachefile]
+                self.results += self.parseresult(pair[1])
+                batchleft -= batchsize
+                i += 1
+            else:
+                sys.stderr.write('Download error - %d\n' % pair[0])
+                break
 
     def loadcache(self):
         self.results = []
         for cache in self.cachefiles:
             with open(cache, 'r') as infile:
-                j = json.loads(infile.read())
-            self.results += self.parsejson(j)
+                s = infile.read()
+            self.results += self.parseresult(s)
 
     def run(self):
         if len(self.cachefiles) == 0:
@@ -90,15 +94,20 @@ class Bing(Search):
         authhandler = urllib2.HTTPBasicAuthHandler(passmgr)
         requestor = urllib2.build_opener(authhandler)
         urllib2.install_opener(requestor)
-        response = requestor.open(q).read()
-        return json.loads(response)
+        status = 0
+        try:
+            response = requestor.open(q).read()
+        except urllib2.HTTPError as e:
+            status = e.code
+            response = e.read()
+        return (status, response)
 
-    def parsejson(self, jsondata):
+    def parseresult(self, result):
+        jsondata = json.loads(result)
         results = jsondata['d']['results']
-        tuples = [[Search.getvaluesafely(result, 'Title'),
-                   Search.getvaluesafely(result, 'Url'),
-                   .0] for result in results]
-        return tuples
+        return [[Search.getvaluesafely(result, 'Title'),
+                 Search.getvaluesafely(result, 'Url'),
+                 .0] for result in results]
 
 class Google(Search):
     def __init__(self, apikey, searchengineid, nresults, keyword):
@@ -115,15 +124,20 @@ class Google(Search):
                self.keyword)
         request = urllib2.Request(q)
         requestor = urllib2.build_opener()
-        response = requestor.open(request).read()
-        return json.loads(response)
+        status = 0
+        try:
+            response = requestor.open(request).read()
+        except urllib2.HTTPError as e:
+            status = e.code
+            response = e.read()
+        return (status, response)
 
-    def parsejson(self, jsondata):
+    def parseresult(self, result):
+        jsondata = json.loads(result)
         results = jsondata['items']
-        tuples = [[Search.getvaluesafely(result, 'title'),
-                   Search.getvaluesafely(result, 'link'),
-                   .0] for result in results]
-        return tuples
+        return [[Search.getvaluesafely(result, 'title'),
+                 Search.getvaluesafely(result, 'link'),
+                 .0] for result in results]
 
 class RankScore:
     def __init__(self, sd_page, sd_inpagerank, pagesize, nresults):
