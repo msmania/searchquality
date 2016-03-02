@@ -64,7 +64,7 @@ class Search(object):
         else:
             self.loadcache()
 
-    def UpdateScores(self, rankscores, evalpage):
+    def updatescores(self, rankscores, evalpage):
         for i in xrange(0, len(self.results)):
             o = urlparse(self.results[i][1])
             score_url = evalpage(self.keyword, self.results[i])
@@ -165,7 +165,7 @@ def EvaluateSingleKeyword(n, keyword):
     ]
     for engine in engines:
         engine.run()
-        engine.UpdateScores(scores.array, EvaluateSearchResultForMSDN)
+        engine.updatescores(scores.array, EvaluateSearchResultForMSDN)
         print '\t'.join([
             engine.name[0],
             keyword,
